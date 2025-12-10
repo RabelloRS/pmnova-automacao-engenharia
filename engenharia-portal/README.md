@@ -11,8 +11,8 @@ engenharia-portal/
 │
 ├── n8n_data/                   # Persistência do n8n (workflows, execuções)
 │
-├── shared_files/               # Pasta compartilhada entre n8n e Streamlit
-│   ├── templates/              # Templates .docx
+├── shared_files/               # Pasta compartilhada entre n8n e Streamlit (/data)
+│   ├── templates/              # Templates .docx para ETP, TR, MD
 │   └── output/                 # Documentos gerados
 │
 └── frontend/                   # Aplicação Streamlit
@@ -20,6 +20,15 @@ engenharia-portal/
     ├── Dockerfile              # Imagem do Streamlit
     └── requirements.txt        # Dependências Python
 ```
+
+### 📌 Padronização de Caminhos
+
+**Importante:** Todos os serviços usam `/data` para arquivos compartilhados:
+- **n8n:** Monta em `/data` via `./shared_files:/data`
+- **Streamlit:** Monta em `/data` via `./shared_files:/data`
+- **Scripts Python:** Buscam arquivos em `/data/templates` e `/data/output`
+
+Esta padronização evita conflitos de caminhos entre os containers.
 
 ---
 
@@ -31,7 +40,10 @@ engenharia-portal/
 cd /root/pmnova/engenharia-portal
 
 # Iniciar os serviços
-docker-compose up -d
+bash start-portal.sh
+
+# Ou manualmente:
+docker-compose up -d --build
 
 # Verificar status
 docker-compose ps
@@ -49,6 +61,16 @@ docker-compose logs -f
 **Credenciais do n8n:**
 - Usuário: `admin`
 - Senha: `engenharia2025`
+
+### 3. Primeiros Passos
+
+⚠️ **IMPORTANTE:** Antes de usar o sistema, siga o **[SETUP_CHECKLIST.md](./SETUP_CHECKLIST.md)**
+
+Os passos incluem:
+1. ✅ Criar templates .docx
+2. ✅ Configurar permissões
+3. ✅ Criar workflow no n8n
+4. ✅ Testar integração
 
 ---
 

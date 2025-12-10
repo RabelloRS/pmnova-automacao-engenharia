@@ -38,8 +38,11 @@ services:
       # Persistência de dados do n8n
       - ./n8n_data:/home/node/.n8n
       
-      # Pasta compartilhada com Streamlit
-      - ./shared_files:/files
+      # Pasta compartilhada com Streamlit (padronizado para /data)
+      - ./shared_files:/data
+      
+      # Scripts Python para execução de automações
+      - ../python_scripts:/data/python_scripts:ro
     
     networks:
       - engenharia_network
@@ -67,11 +70,8 @@ services:
       - N8N_WEBHOOK_URL=http://n8n:5678/webhook/gerar-etp
     
     volumes:
-      # Pasta compartilhada com n8n
-      - ./shared_files:/files
-      
-      # Hot reload durante desenvolvimento (opcional)
-      - ./frontend/app.py:/app/app.py
+      # Pasta compartilhada com n8n (padronizado para /data)
+      - ./shared_files:/data
     
     networks:
       - engenharia_network

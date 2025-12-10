@@ -13,7 +13,7 @@ import time
 # Configurações
 # ========================================
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n:5678/webhook/gerar-etp")
-OUTPUT_DIR = "/files/output"
+OUTPUT_DIR = "/data/output"
 
 # ========================================
 # Configuração da Página

@@ -1,0 +1,12 @@
+Objeto: {{OBJETO}}
+
+Justificativa: {{JUSTIFICATIVA}}
+
+Valor Estimado: {{VALOR_ESTIMADO}}
+
+Responsável: {{RESPONSAVEL}}
+
+Data: {{DATA_ATUAL}}
+
+Descrição Técnica:
+{{TEXTO_IA}}
