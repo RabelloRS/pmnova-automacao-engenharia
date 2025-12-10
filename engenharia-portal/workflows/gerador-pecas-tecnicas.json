@@ -1,0 +1,145 @@
+{
+  "meta": {
+    "instanceId": "generated_uuid"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gerar-etp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook (Recebe Pedido)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        460,
+        340
+      ],
+      "webhookId": "gerar-etp"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Você é um Engenheiro Civil Sênior concursado, atuando no setor de Planejamento e Projetos da Prefeitura Municipal de Nova Petrópolis/RS. Sua função é redigir partes técnicas do Estudo Técnico Preliminar (ETP), Termo de Referência (TR) e Memorial Descritivo (MD) em estrita conformidade com a Nova Lei de Licitações (Lei Federal nº 14.133/2021). Utilize linguagem formal, impessoal, culta e técnica. Foque na supremacia do interesse público, na economicidade e na eficácia da contratação. Não use markdown, negrito ou introduções como 'Aqui está o texto'. Entregue apenas o texto corrido dos parágrafos."
+            },
+            {
+              "role": "user",
+              "content": "={{ 'Com base nos dados abaixo, redija o texto completo para a seção de JUSTIFICATIVA E DESCRIÇÃO TÉCNICA para um documento do tipo ' + $json.body.tipo_peca.toUpperCase() + '.\n\nDados:\nObjeto: ' + $json.body.objeto + '\nMotivação: ' + $json.body.justificativa + '\nValor Estimado: ' + $json.body.valor_estimado }}"
+            }
+          ]
+        }
+      },
+      "id": "openai-node",
+      "name": "IA (Escreve Texto Técnico)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        680,
+        340
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "SEU_ID_DA_CREDENCIAL_AQUI",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=python3 /data/python_scripts/gerar_peca.py '{{ JSON.stringify({ \"tipo\": $json.body.tipo_peca, \"dados\": { \"OBJETO\": $json.body.objeto, \"JUSTIFICATIVA\": $json.body.justificativa, \"VALOR_ESTIMADO\": $json.body.valor_estimado, \"TEXTO_IA\": $(\"IA (Escreve Texto Técnico)\").first().json.choices[0].message.content, \"objeto_resumido\": $json.body.objeto.substring(0, 30) } }) }}'"
+      },
+      "id": "execute-command",
+      "name": "Python (Gera .DOCX)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        900,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const pythonOutput = JSON.parse($input.first().json.stdout);\n\nreturn {\n  \"status\": pythonOutput.status,\n  \"arquivo\": pythonOutput.arquivo,\n  \"timestamp\": new Date().toISOString()\n};"
+      },
+      "id": "format-response",
+      "name": "Formata Resposta JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1020,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Responde ao Streamlit",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        340
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook (Recebe Pedido)": {
+      "main": [
+        [
+          {
+            "node": "IA (Escreve Texto Técnico)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA (Escreve Texto Técnico)": {
+      "main": [
+        [
+          {
+            "node": "Python (Gera .DOCX)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Python (Gera .DOCX)": {
+      "main": [
+        [
+          {
+            "node": "Formata Resposta JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formata Resposta JSON": {
+      "main": [
+        [
+          {
+            "node": "Responde ao Streamlit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
