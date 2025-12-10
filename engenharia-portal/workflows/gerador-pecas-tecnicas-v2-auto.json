@@ -1,0 +1,233 @@
+{
+  "name": "Gerador de Peças Técnicas com Extração Automática de PDFs",
+  "meta": {
+    "instanceId": "generated_uuid_v2"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gerar-etp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook (Recebe Pedido)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [260, 340],
+      "webhookId": "gerar-etp"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.modo_extracao }}",
+              "operation": "equals",
+              "value2": "automatico"
+            }
+          ]
+        }
+      },
+      "id": "check-mode",
+      "name": "Modo Extração?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [480, 340]
+    },
+    {
+      "parameters": {
+        "command": "=python3 /data/python_scripts/extrator_caixa.py {{ $json.body.pasta_uploads }}"
+      },
+      "id": "extract-pdf",
+      "name": "Extrai Dados dos PDFs",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [700, 240],
+      "notes": "Executa extrator_caixa.py para ler PO.pdf, QCI.pdf, PLQ.pdf"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse do JSON retornado pelo script Python\nconst dadosExtraidos = JSON.parse($input.first().json.stdout);\nconst dadosFormulario = $('Webhook (Recebe Pedido)').first().json.body;\n\n// Merge: dados extraídos + dados do formulário\nreturn {\n  tipo_peca: dadosFormulario.tipo_peca,\n  \n  // Dados extraídos dos PDFs (prioridade)\n  OBJETO: dadosExtraidos.OBJETO || dadosFormulario.objeto,\n  VALOR_GLOBAL: dadosExtraidos.VALOR_GLOBAL || dadosFormulario.valor_estimado,\n  VALOR_REPASSE: dadosExtraidos.VALOR_REPASSE || '0,00',\n  VALOR_CONTRAPARTIDA: dadosExtraidos.VALOR_CONTRAPARTIDA || '0,00',\n  AREA_TOTAL: dadosExtraidos.AREA_TOTAL || '0,00',\n  BDI: dadosExtraidos.BDI || '0,00',\n  DATA_BASE: dadosExtraidos.DATA_BASE || '',\n  LOCAL: dadosExtraidos.LOCAL || 'Nova Petrópolis/RS',\n  \n  // Dados do formulário (complementares)\n  justificativa: dadosFormulario.justificativa,\n  setor: dadosFormulario.setor,\n  responsavel: dadosFormulario.responsavel,\n  \n  // Metadados\n  modo: 'automatico',\n  arquivos_processados: dadosExtraidos.arquivos_processados || []\n};"
+      },
+      "id": "merge-data-auto",
+      "name": "Merge (Dados Extraídos)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 240],
+      "notes": "Combina dados extraídos dos PDFs com dados do formulário"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Modo manual: usa apenas dados do formulário\nconst dadosFormulario = $('Webhook (Recebe Pedido)').first().json.body;\n\nreturn {\n  tipo_peca: dadosFormulario.tipo_peca,\n  OBJETO: dadosFormulario.objeto,\n  VALOR_GLOBAL: dadosFormulario.valor_estimado,\n  VALOR_REPASSE: '0,00',\n  VALOR_CONTRAPARTIDA: '0,00',\n  AREA_TOTAL: '0,00',\n  BDI: '0,00',\n  DATA_BASE: '',\n  LOCAL: 'Nova Petrópolis/RS',\n  justificativa: dadosFormulario.justificativa,\n  setor: dadosFormulario.setor,\n  responsavel: dadosFormulario.responsavel,\n  modo: 'manual',\n  arquivos_processados: []\n};"
+      },
+      "id": "prepare-manual",
+      "name": "Prepara Dados (Manual)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 440],
+      "notes": "Usa dados digitados manualmente quando não há PDFs"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Você é um Engenheiro Civil Sênior concursado, atuando no setor de Planejamento e Projetos da Prefeitura Municipal de Nova Petrópolis/RS. Sua função é redigir partes técnicas do Estudo Técnico Preliminar (ETP), Termo de Referência (TR) e Memorial Descritivo (MD) em estrita conformidade com a Nova Lei de Licitações (Lei Federal nº 14.133/2021). Utilize linguagem formal, impessoal, culta e técnica. Foque na supremacia do interesse público, na economicidade e na eficácia da contratação. Não use markdown, negrito ou introduções como 'Aqui está o texto'. Entregue apenas o texto corrido dos parágrafos."
+            },
+            {
+              "role": "user",
+              "content": "={{ 'Com base nos dados técnicos extraídos da planilha da Caixa, redija o texto completo para a seção de JUSTIFICATIVA E DESCRIÇÃO TÉCNICA para um documento do tipo ' + $json.tipo_peca.toUpperCase() + '.\\n\\nDADOS EXTRAÍDOS:\\nObjeto: ' + $json.OBJETO + '\\nValor Global: R$ ' + $json.VALOR_GLOBAL + '\\nValor Repasse: R$ ' + $json.VALOR_REPASSE + '\\nContrapartida: R$ ' + $json.VALOR_CONTRAPARTIDA + '\\nÁrea Total: ' + $json.AREA_TOTAL + ' m²\\nBDI: ' + $json.BDI + '%\\nLocal: ' + $json.LOCAL + '\\n\\nMOTIVAÇÃO ADICIONAL: ' + $json.justificativa }}"
+            }
+          ]
+        }
+      },
+      "id": "openai-node",
+      "name": "IA (Escreve Texto Técnico)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1140, 340],
+      "credentials": {
+        "openAiApi": {
+          "id": "SEU_ID_DA_CREDENCIAL_AQUI",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=python3 /data/python_scripts/gerar_peca.py '{{ JSON.stringify({ \"tipo\": $('Merge (Dados Extraídos)').first().json.tipo_peca || $('Prepara Dados (Manual)').first().json.tipo_peca, \"dados\": { \"OBJETO\": $('Merge (Dados Extraídos)').first().json.OBJETO || $('Prepara Dados (Manual)').first().json.OBJETO, \"JUSTIFICATIVA\": $('Merge (Dados Extraídos)').first().json.justificativa || $('Prepara Dados (Manual)').first().json.justificativa, \"VALOR_GLOBAL\": $('Merge (Dados Extraídos)').first().json.VALOR_GLOBAL || $('Prepara Dados (Manual)').first().json.VALOR_GLOBAL, \"VALOR_REPASSE\": $('Merge (Dados Extraídos)').first().json.VALOR_REPASSE || '0,00', \"VALOR_CONTRAPARTIDA\": $('Merge (Dados Extraídos)').first().json.VALOR_CONTRAPARTIDA || '0,00', \"AREA_TOTAL\": $('Merge (Dados Extraídos)').first().json.AREA_TOTAL || '0,00', \"BDI\": $('Merge (Dados Extraídos)').first().json.BDI || '0,00', \"TEXTO_IA\": $json.content, \"objeto_resumido\": ($('Merge (Dados Extraídos)').first().json.OBJETO || $('Prepara Dados (Manual)').first().json.OBJETO).substring(0, 30) } }) }}'"
+      },
+      "id": "execute-command",
+      "name": "Python (Gera .DOCX)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1360, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "const pythonOutput = JSON.parse($input.first().json.stdout);\nconst dadosMerge = $('Merge (Dados Extraídos)').first() || $('Prepara Dados (Manual)').first();\n\nreturn {\n  status: pythonOutput.status,\n  arquivo: pythonOutput.arquivo,\n  timestamp: new Date().toISOString(),\n  modo_extracao: dadosMerge.json.modo,\n  arquivos_pdf_processados: dadosMerge.json.arquivos_processados,\n  dados_extraidos: {\n    objeto: dadosMerge.json.OBJETO,\n    valor_global: dadosMerge.json.VALOR_GLOBAL,\n    valor_repasse: dadosMerge.json.VALOR_REPASSE\n  }\n};"
+      },
+      "id": "format-response",
+      "name": "Formata Resposta JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 340]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Responde ao Streamlit",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1800, 340]
+    }
+  ],
+  "connections": {
+    "Webhook (Recebe Pedido)": {
+      "main": [
+        [
+          {
+            "node": "Modo Extração?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modo Extração?": {
+      "main": [
+        [
+          {
+            "node": "Extrai Dados dos PDFs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepara Dados (Manual)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrai Dados dos PDFs": {
+      "main": [
+        [
+          {
+            "node": "Merge (Dados Extraídos)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge (Dados Extraídos)": {
+      "main": [
+        [
+          {
+            "node": "IA (Escreve Texto Técnico)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara Dados (Manual)": {
+      "main": [
+        [
+          {
+            "node": "IA (Escreve Texto Técnico)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA (Escreve Texto Técnico)": {
+      "main": [
+        [
+          {
+            "node": "Python (Gera .DOCX)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Python (Gera .DOCX)": {
+      "main": [
+        [
+          {
+            "node": "Formata Resposta JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formata Resposta JSON": {
+      "main": [
+        [
+          {
+            "node": "Responde ao Streamlit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

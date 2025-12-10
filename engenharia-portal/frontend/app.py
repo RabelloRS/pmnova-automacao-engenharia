@@ -120,6 +120,41 @@ elif menu_option == "📝 Gerador de ETP/TR":
     
     # Formulário
     with st.form("form_gerar_peca"):
+        # ========================================
+        # SEÇÃO 1: Upload de PDFs da Caixa
+        # ========================================
+        st.markdown("### 📎 Upload de Planilhas da Caixa (Opcional - Modo Automático)")
+        st.info("""
+        **💡 Extração Automática:** Envie os PDFs da Caixa e o sistema extrairá automaticamente:
+        - 📋 Objeto da obra
+        - 💰 Valores (Global, Repasse, Contrapartida)  
+        - 📐 Área total (m²)
+        - 📊 BDI e Data Base
+        
+        **Se não enviar PDFs**, preencha manualmente os campos abaixo.
+        """)
+        
+        uploaded_files = st.file_uploader(
+            "Carregue os arquivos: PO.pdf, QCI.pdf, PLQ.pdf",
+            type=['pdf'],
+            accept_multiple_files=True,
+            help="Planilhas orçamentárias da Caixa Econômica Federal"
+        )
+        
+        # Mostra arquivos enviados
+        if uploaded_files:
+            st.success(f"✅ {len(uploaded_files)} arquivo(s) carregado(s):")
+            for uploaded_file in uploaded_files:
+                file_size_kb = uploaded_file.size / 1024
+                st.text(f"  📄 {uploaded_file.name} ({file_size_kb:.1f} KB)")
+        
+        st.markdown("---")
+        
+        # ========================================
+        # SEÇÃO 2: Dados do Documento
+        # ========================================
+        st.markdown("### 📝 Informações do Documento")
+        
         col1, col2 = st.columns([2, 1])
         
         with col1:
@@ -177,6 +212,24 @@ elif menu_option == "📝 Gerador de ETP/TR":
         if not objeto or not justificativa:
             st.error("❌ Por favor, preencha todos os campos obrigatórios (Objeto e Justificativa).")
         else:
+            # ========================================
+            # Processar Upload de PDFs (se houver)
+            # ========================================
+            pasta_uploads = "/data/uploads"
+            os.makedirs(pasta_uploads, exist_ok=True)
+            
+            pdf_enviados = []
+            if uploaded_files:
+                with st.spinner("📤 Salvando arquivos PDF..."):
+                    for uploaded_file in uploaded_files:
+                        # Salvar arquivo na pasta compartilhada
+                        caminho_arquivo = os.path.join(pasta_uploads, uploaded_file.name)
+                        with open(caminho_arquivo, "wb") as f:
+                            f.write(uploaded_file.getbuffer())
+                        pdf_enviados.append(uploaded_file.name)
+                
+                st.success(f"✅ {len(pdf_enviados)} PDF(s) salvo(s) em {pasta_uploads}")
+            
             # Extrair tipo de peça (sigla)
             tipo_sigla = tipo_peca.split(" - ")[0].lower()
             
@@ -188,11 +241,16 @@ elif menu_option == "📝 Gerador de ETP/TR":
                 "valor_estimado": f"R$ {valor_estimado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
                 "setor": setor,
                 "responsavel": responsavel,
-                "data_solicitacao": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                "data_solicitacao": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                # Novos campos para extração automática
+                "modo_extracao": "automatico" if uploaded_files else "manual",
+                "pasta_uploads": pasta_uploads if uploaded_files else None,
+                "arquivos_pdf": pdf_enviados if uploaded_files else []
             }
             
             # Mostrar loading
-            with st.spinner("⏳ Gerando documento com IA... Aguarde!"):
+            mensagem_loading = "⏳ Extraindo dados dos PDFs e gerando documento com IA..." if uploaded_files else "⏳ Gerando documento com IA... Aguarde!"
+            with st.spinner(mensagem_loading):
                 try:
                     # Enviar requisição para o webhook do n8n
                     response = requests.post(
