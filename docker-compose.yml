@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: pmnova-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # Timezone
+      - TZ=America/Sao_Paulo
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      
+      # n8n Configuration
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5678/}
+      
+      # Execution Configuration
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
+      
+      # Security (altere em produção)
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE:-true}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-admin123}
+      
+      # Editor Configuration
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-http://localhost:5678}
+      
+      # Python e Shell Execution
+      - N8N_ALLOW_EXECUTION_OF_ALL_SCRIPTS=true
+    
+    volumes:
+      # Persistência de dados do n8n
+      - n8n_data:/home/node/.n8n
+      
+      # Mapeamento das pastas locais para o container
+      - ./python_scripts:/data/python_scripts:rw
+      - ./templates:/data/templates:ro
+      - ./output:/data/output:rw
+      - ./workflows:/data/workflows:rw
+      
+      # Opcional: Custom nodes ou configurações adicionais
+      # - ./custom-nodes:/home/node/.n8n/custom
+    
+    networks:
+      - pmnova_network
+    
+    # Healthcheck
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  n8n_data:
+    driver: local
+
+networks:
+  pmnova_network:
+    driver: bridge

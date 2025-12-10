@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # ========================================
+  # Serviço n8n - Orquestração de Workflows
+  # ========================================
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: engenharia-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # Timezone
+      - TZ=America/Sao_Paulo
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      
+      # Configurações do n8n
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://n8n:5678/
+      
+      # Execuções
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
+      
+      # Segurança
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=engenharia2025
+      
+      # Permitir execução de scripts
+      - N8N_ALLOW_EXECUTION_OF_ALL_SCRIPTS=true
+    
+    volumes:
+      # Persistência de dados do n8n
+      - ./n8n_data:/home/node/.n8n
+      
+      # Pasta compartilhada com Streamlit
+      - ./shared_files:/files
+    
+    networks:
+      - engenharia_network
+    
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # Serviço Streamlit - Interface Web
+  # ========================================
+  streamlit:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: engenharia-streamlit
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      - TZ=America/Sao_Paulo
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/gerar-etp
+    
+    volumes:
+      # Pasta compartilhada com n8n
+      - ./shared_files:/files
+      
+      # Hot reload durante desenvolvimento (opcional)
+      - ./frontend/app.py:/app/app.py
+    
+    networks:
+      - engenharia_network
+    
+    depends_on:
+      - n8n
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+# ========================================
+# Rede compartilhada
+# ========================================
+networks:
+  engenharia_network:
+    driver: bridge
+    name: engenharia_network

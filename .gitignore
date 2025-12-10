@@ -1,0 +1,49 @@
+# Environment variables
+.env
+
+# Output files
+output/*
+!output/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+python_scripts/venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+n8n_data/
+engenharia-portal/n8n_data/
+engenharia-portal/shared_files/output/*
+!engenharia-portal/shared_files/output/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+temp/
+
+# Build artifacts
+*.pyc
+dist/
+build/
+*.egg-info/

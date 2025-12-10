@@ -1,0 +1,30 @@
+# Environment
+.env
+
+# Docker volumes
+n8n_data/*
+!n8n_data/.gitkeep
+
+# Output files
+shared_files/output/*
+!shared_files/output/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
