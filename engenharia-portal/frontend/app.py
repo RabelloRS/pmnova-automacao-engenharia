@@ -12,7 +12,8 @@ import time
 # ========================================
 # Configurações
 # ========================================
-N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n:5678/webhook/gerar-etp")
+# URL do backend Python (substituiu n8n)
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://backend:5000/gerar-etp")
 OUTPUT_DIR = "/data/output"
 
 # ========================================
@@ -20,58 +21,217 @@ OUTPUT_DIR = "/data/output"
 # ========================================
 st.set_page_config(
     page_title="Sistema de Engenharia - PMNP",
-    page_icon="🏗️",
+    page_icon="assets/icone_np.png",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        "About": "Sistema de Automação de Engenharia Civil - Prefeitura Municipal de Nova Petrópolis"
+    }
 )
 
 # ========================================
-# CSS Customizado
+# CSS Customizado - Identidade Visual PMNP
 # ========================================
 st.markdown("""
     <style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #1f77b4;
-        text-align: center;
-        padding: 1rem 0;
-        border-bottom: 3px solid #1f77b4;
-        margin-bottom: 2rem;
+    /* Esconde apenas o footer */
+    footer {
+        display: none !important;
     }
-    .stButton>button {
+    
+    /* Paleta oficial da Prefeitura de Nova Petrópolis */
+    :root {
+        --pmnp-blue: #1d98bb;
+        --pmnp-blue-dark: #156b84;
+        --pmnp-blue-light: #e6f5f9;
+        --pmnp-green: #28a745;
+        --pmnp-gray: #6c757d;
+    }
+    
+    /* Header fullwidth */
+    .pmnp-header {
+        background: #ffffff;
+        padding: 1rem 1.5rem;
+        margin: 0;
         width: 100%;
-        background-color: #1f77b4;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 1.5rem;
+        min-height: 85px;
+        border-bottom: 4px solid #1d98bb;
+        box-sizing: border-box;
+    }
+    
+    .pmnp-brasao-header {
+        max-width: 90px;
+        height: auto;
+        max-height: 85px;
+        flex-shrink: 0;
+    }
+    
+    .pmnp-header-logo {
+        max-width: 280px;
+        height: auto;
+        max-height: 75px;
+        flex-shrink: 0;
+    }
+    
+    .pmnp-header-divider {
+        width: 2px;
+        height: 60px;
+        background: rgba(29,152,187,0.2);
+        margin: 0 1rem;
+        flex-shrink: 0;
+    }
+    
+    .pmnp-header-text {
+        flex: 1;
+    }
+    
+    .pmnp-header h1 {
+        color: #1d98bb;
+        font-size: 1.9rem;
+        font-weight: 700;
+        margin: 0;
+        line-height: 1.2;
+        letter-spacing: -0.5px;
+    }
+    
+    .pmnp-header p {
+        color: #666;
+        font-size: 0.95rem;
+        margin: 0.15rem 0 0 0;
+        font-weight: 400;
+    }
+    
+    /* Brasão topo - REMOVIDO - Agora fica no header */
+    
+    /* Ajuste geral da página */
+    .main .block-container {
+        padding-top: 0 !important;
+        max-width: 1400px;
+    }
+    
+    /* Botões com estilo PMNP */
+    .stButton>button {
+        background-color: #1d98bb;
         color: white;
-        font-size: 1.2rem;
-        padding: 0.75rem;
-        border-radius: 8px;
+        font-weight: 600;
+        border-radius: 6px;
         border: none;
-        font-weight: bold;
+        padding: 0.6rem 2rem;
+        transition: all 0.3s ease;
     }
+    
     .stButton>button:hover {
-        background-color: #145a8a;
+        background-color: #156b84;
+        box-shadow: 0 4px 12px rgba(29,152,187,0.3);
     }
-    .success-box {
-        padding: 1rem;
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        border-radius: 5px;
-        color: #155724;
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #f8f9fa;
+        border-right: 2px solid #1d98bb;
     }
-    .info-box {
-        padding: 1rem;
-        background-color: #d1ecf1;
-        border: 1px solid #bee5eb;
-        border-radius: 5px;
-        color: #0c5460;
+    
+    /* Cards e boxes */
+    .stInfo {
+        background-color: #e6f5f9 !important;
+        border-left: 4px solid #1d98bb !important;
+    }
+    
+    .stSuccess {
+        background-color: #d4edda !important;
+        border-left: 4px solid #28a745 !important;
+    }
+    
+    .stWarning {
+        background-color: #fff3cd !important;
+        border-left: 4px solid #ffc107 !important;
+    }
+    
+    .stError {
+        background-color: #f8d7da !important;
+        border-left: 4px solid #dc3545 !important;
+    }
+    
+    /* Footer PMNP */
+    .pmnp-footer {
+        margin-top: 3rem;
+        padding: 2rem;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-top: 4px solid #1d98bb;
+        text-align: center;
+        color: #495057;
+        border-radius: 8px;
+    }
+    
+    .pmnp-footer-brasao {
+        max-height: 80px;
+        margin-bottom: 1rem;
+        opacity: 0.9;
+    }
+    
+    .pmnp-footer strong {
+        color: #156b84;
+        font-size: 1.1rem;
+    }
+    
+    .pmnp-footer p {
+        margin: 0.5rem 0;
+        line-height: 1.6;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ========================================
-# Cabeçalho Principal
+# Cabeçalho Principal com Logo
 # ========================================
-st.markdown('<h1 class="main-header">🏗️ Sistema de Engenharia - PM Nova Petrópolis</h1>', unsafe_allow_html=True)
+import base64
+
+def get_base64_image(image_path):
+    """Converte imagem para base64 para embedding no HTML"""
+    try:
+        with open(image_path, "rb") as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    except:
+        return None
+
+# Tentar carregar imagens
+logo_cabecalho = get_base64_image("assets/logo_cab_text2.png")
+brasao = get_base64_image("assets/brasao_np.png")
+
+# ========================================
+# Cabeçalho com Logo e Brasão
+# ========================================
+if logo_cabecalho and brasao:
+    st.markdown(f'''
+    <div class="pmnp-header">
+        <img src="data:image/png;base64,{brasao}" alt="Brasão Nova Petrópolis" class="pmnp-brasao-header">
+        <img src="data:image/png;base64,{logo_cabecalho}" alt="Prefeitura Nova Petrópolis" class="pmnp-header-logo">
+        <div class="pmnp-header-divider"></div>
+        <div class="pmnp-header-text">
+            <h1>Sistema de Engenharia</h1>
+            <p>Secretaria de Planejamento, Coordenação, Trânsito e Habitação</p>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+elif logo_cabecalho:
+    st.markdown(f'''
+    <div class="pmnp-header">
+        <img src="data:image/png;base64,{logo_cabecalho}" alt="Prefeitura Nova Petrópolis" class="pmnp-header-logo">
+        <div class="pmnp-header-divider"></div>
+        <div class="pmnp-header-text">
+            <h1>Sistema de Engenharia</h1>
+            <p>Secretaria de Planejamento, Coordenação, Trânsito e Habitação</p>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+else:
+    st.markdown('<div class="pmnp-header"><div class="pmnp-header-text"><h1>🏗️ Sistema de Engenharia</h1><p>Prefeitura Municipal de Nova Petrópolis</p></div></div>', unsafe_allow_html=True)
 
 # ========================================
 # Menu Lateral
@@ -88,8 +248,14 @@ st.sidebar.markdown("---")
 st.sidebar.info(f"""
 **Sistema Ativo**  
 🕒 {datetime.now().strftime('%d/%m/%Y %H:%M')}  
-🌐 Conectado ao n8n  
+🌐 Backend Python Ativo  
 """)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("#### 🔗 Acesso Rápido")
+st.sidebar.markdown("")
+st.sidebar.markdown("🔧 **[API Backend →](http://172.22.49.116:5000/health)**")
+st.sidebar.markdown("📖 **[Documentação →](https://github.com/RabelloRS/pmnova-automacao-engenharia)**")
 
 # ========================================
 # Página: Início
@@ -106,7 +272,7 @@ if menu_option == "🏠 Início":
         st.info("**📊 Consultar Documentos**\n\nAcesse documentos gerados anteriormente.")
     
     with col3:
-        st.info("**🤖 Automação Inteligente**\n\nSistema integrado com n8n e IA.")
+        st.info("**🤖 Automação Inteligente**\n\nProcessamento direto em Python + IA.")
     
     st.markdown("---")
     st.success("✅ Sistema operacional. Selecione um módulo no menu lateral para começar.")
@@ -184,7 +350,7 @@ elif menu_option == "📝 Gerador de ETP/TR":
             "Justificativa",
             placeholder="Descreva a justificativa técnica para a contratação...",
             height=150,
-            help="Explique a necessidade e a justificativa técnica"
+            help="Explique a necessidade e a justificativa técnica (será gerada automaticamente se enviar PDFs)"
         )
         
         col3, col4 = st.columns(2)
@@ -192,7 +358,7 @@ elif menu_option == "📝 Gerador de ETP/TR":
         with col3:
             setor = st.text_input(
                 "Setor Responsável",
-                value="Secretaria de Obras e Infraestrutura",
+                value="Secretaria de Planejamento, Coordenação, Trânsito e Habitação",
                 help="Setor ou secretaria responsável"
             )
         
@@ -252,9 +418,9 @@ elif menu_option == "📝 Gerador de ETP/TR":
             mensagem_loading = "⏳ Extraindo dados dos PDFs e gerando documento com IA..." if uploaded_files else "⏳ Gerando documento com IA... Aguarde!"
             with st.spinner(mensagem_loading):
                 try:
-                    # Enviar requisição para o webhook do n8n
-                    response = requests.post(
-                        N8N_WEBHOOK_URL,
+                    # Enviar requisição para o backend Python
+                    resposta = requests.post(
+                        BACKEND_API_URL,
                         json=payload,
                         timeout=120  # 2 minutos de timeout
                     )
@@ -315,7 +481,7 @@ elif menu_option == "📝 Gerador de ETP/TR":
                     st.error("❌ Timeout: O servidor demorou muito para responder. Tente novamente.")
                 
                 except requests.exceptions.ConnectionError:
-                    st.error("❌ Erro de conexão: Não foi possível conectar ao n8n. Verifique se o serviço está rodando.")
+                    st.error("❌ Erro de conexão: Não foi possível conectar ao backend. Verifique se o serviço está rodando.")
                 
                 except Exception as e:
                     st.error(f"❌ Erro inesperado: {str(e)}")
@@ -382,7 +548,7 @@ elif menu_option == "ℹ️ Sobre":
     
     #### 🔧 Tecnologias Utilizadas:
     - **Streamlit:** Interface web interativa
-    - **n8n:** Orquestração de workflows
+    - **Backend Python:** API de processamento (Flask + OpenAI)
     - **Docker:** Containerização e deploy
     - **Python:** Scripts de processamento
     - **IA/LLM:** Geração inteligente de textos técnicos
@@ -408,7 +574,31 @@ elif menu_option == "ℹ️ Sobre":
 # Footer
 # ========================================
 st.markdown("---")
-st.markdown(
-    "<div style='text-align: center; color: #666;'>© 2025 Prefeitura Municipal de Nova Petrópolis - Todos os direitos reservados</div>",
-    unsafe_allow_html=True
-)
+
+# Footer com brasão e informações institucionais
+if brasao:
+    footer_html = f'''
+    <div class="pmnp-footer">
+        <img src="data:image/png;base64,{brasao}" alt="Brasão Nova Petrópolis" class="pmnp-footer-brasao">
+        <p style="margin-top: 1rem;">
+            <strong>Prefeitura Municipal de Nova Petrópolis</strong><br>
+            Rua 7 de Setembro, 330 - 2º Piso | CEP 95150-000<br>
+            📞 (54) 3281.8400 | ✉️ comunicacao@novapetropolis.rs.gov.br<br>
+            🕒 Horário de Atendimento: 8h às 12h e 13h10 às 16h40
+        </p>
+        <p style="margin-top: 1rem; font-size: 0.85rem; color: #6c757d;">
+            Sistema de Engenharia v1.0 | © 2025 - Todos os direitos reservados
+        </p>
+    </div>
+    '''
+else:
+    footer_html = '''
+    <div class="pmnp-footer">
+        <p>
+            <strong>Prefeitura Municipal de Nova Petrópolis</strong><br>
+            © 2025 - Todos os direitos reservados
+        </p>
+    </div>
+    '''
+
+st.markdown(footer_html, unsafe_allow_html=True)

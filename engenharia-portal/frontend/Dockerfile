@@ -18,6 +18,12 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copiar código da aplicação
 COPY app.py .
 
+# Copiar configuração Streamlit
+COPY .streamlit/ ./.streamlit/
+
+# Copiar assets (logos e imagens da PMNP)
+COPY assets/ ./assets/
+
 # Expor porta do Streamlit
 EXPOSE 8501
 

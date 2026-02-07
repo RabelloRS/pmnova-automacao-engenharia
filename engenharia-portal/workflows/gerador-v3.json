@@ -1,0 +1,250 @@
+{
+  "name": "Gerador de Peças Técnicas v3",
+  "meta": {
+    "instanceId": "generated_uuid_v3"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gerar-etp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook (Recebe Pedido)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [260, 340],
+      "webhookId": "gerar-etp"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.body.modo_extracao === 'automatico' }}"
+            }
+          ]
+        }
+      },
+      "id": "check-mode",
+      "name": "Modo Extração?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [480, 340]
+    },
+    {
+      "parameters": {
+        "command": "=python3 /data/python_scripts/extrator_caixa.py {{ $json.body.pasta_uploads }}"
+      },
+      "id": "extract-pdf",
+      "name": "Extrai Dados dos PDFs",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [700, 240],
+      "notes": "Executa extrator_caixa.py para ler PO.pdf, QCI.pdf, PLQ.pdf"
+    },
+    {
+      "parameters": {
+        "jsCode": "const dadosExtraidos = JSON.parse($input.first().json.stdout || '{}');\nconst dadosFormulario = $node['Webhook (Recebe Pedido)'].json.body;\nreturn {\n  tipo_peca: dadosFormulario.tipo_peca,\n  OBJETO: dadosExtraidos.OBJETO || dadosFormulario.objeto || '',\n  VALOR_GLOBAL: dadosExtraidos.VALOR_GLOBAL || dadosFormulario.valor_estimado || '',\n  VALOR_REPASSE: dadosExtraidos.VALOR_REPASSE || '0,00',\n  VALOR_CONTRAPARTIDA: dadosExtraidos.VALOR_CONTRAPARTIDA || '0,00',\n  AREA_TOTAL: dadosExtraidos.AREA_TOTAL || '0,00',\n  BDI: dadosExtraidos.BDI || '0,00',\n  DATA_BASE: dadosExtraidos.DATA_BASE || '',\n  LOCAL: dadosExtraidos.LOCAL || 'Nova Petrópolis/RS',\n  justificativa: dadosFormulario.justificativa || '',\n  setor: dadosFormulario.setor || '',\n  responsavel: dadosFormulario.responsavel || '',\n  modo: 'automatico',\n  arquivos_processados: dadosExtraidos.arquivos_processados || []\n};"
+      },
+      "id": "merge-data-auto",
+      "name": "Merge Dados (Auto)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const dadosFormulario = $node['Webhook (Recebe Pedido)'].json.body;\nreturn {\n  tipo_peca: dadosFormulario.tipo_peca || '',\n  OBJETO: dadosFormulario.objeto || '',\n  VALOR_GLOBAL: dadosFormulario.valor_estimado || '',\n  VALOR_REPASSE: '0,00',\n  VALOR_CONTRAPARTIDA: '0,00',\n  AREA_TOTAL: '0,00',\n  BDI: '0,00',\n  DATA_BASE: '',\n  LOCAL: 'Nova Petrópolis/RS',\n  justificativa: dadosFormulario.justificativa || '',\n  setor: dadosFormulario.setor || '',\n  responsavel: dadosFormulario.responsavel || '',\n  modo: 'manual',\n  arquivos_processados: []\n};"
+      },
+      "id": "prepare-manual",
+      "name": "Prepara Dados (Manual)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 440]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4o Mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Você é um Engenheiro Civil Sênior. Redija partes técnicas de ETP, TR e MD em conformidade com Lei 14.133/2021. Use linguagem formal, impessoal e técnica. Foque no interesse público e economicidade."
+            },
+            {
+              "role": "user",
+              "content": "={{ 'Redija justificativa para ' + $json.tipo_peca.toUpperCase() + '. Objeto: ' + $json.OBJETO + '. Valor: R$ ' + $json.VALOR_GLOBAL + '. Área: ' + $json.AREA_TOTAL + ' m². Local: ' + $json.LOCAL + '. Informação adicional: ' + $json.justificativa }}"
+            }
+          ]
+        }
+      },
+      "id": "openai-node",
+      "name": "IA (Escreve Texto Técnico)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1140, 340],
+      "credentials": {
+        "openAiApi": {
+          "id": "SEU_ID_DA_CREDENCIAL_AQUI",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const dadosParaDocumento = $input.first().json;\nconst textoia = $node['IA (Escreve Texto Técnico)'].json.message.content;\nreturn {\n  tipo_peca: dadosParaDocumento.tipo_peca,\n  OBJETO: dadosParaDocumento.OBJETO,\n  VALOR_GLOBAL: dadosParaDocumento.VALOR_GLOBAL,\n  VALOR_REPASSE: dadosParaDocumento.VALOR_REPASSE,\n  VALOR_CONTRAPARTIDA: dadosParaDocumento.VALOR_CONTRAPARTIDA,\n  AREA_TOTAL: dadosParaDocumento.AREA_TOTAL,\n  BDI: dadosParaDocumento.BDI,\n  DATA_BASE: dadosParaDocumento.DATA_BASE,\n  LOCAL: dadosParaDocumento.LOCAL,\n  TEXTO_IA: textoia,\n  setor: dadosParaDocumento.setor,\n  responsavel: dadosParaDocumento.responsavel,\n  modo: dadosParaDocumento.modo\n};"
+      },
+      "id": "prepare-python",
+      "name": "Prepara para Python",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 340]
+    },
+    {
+      "parameters": {
+        "command": "=python3 /data/python_scripts/gerar_peca.py '{{ JSON.stringify({tipo: $json.tipo_peca, dados: {OBJETO: $json.OBJETO, JUSTIFICATIVA: $json.TEXTO_IA, VALOR_GLOBAL: $json.VALOR_GLOBAL, VALOR_REPASSE: $json.VALOR_REPASSE, VALOR_CONTRAPARTIDA: $json.VALOR_CONTRAPARTIDA, AREA_TOTAL: $json.AREA_TOTAL, BDI: $json.BDI}}) }}'"
+      },
+      "id": "execute-command",
+      "name": "Python (Gera .DOCX)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1500, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "const pythonOutput = JSON.parse($input.first().json.stdout || '{}');\nreturn {\n  status: pythonOutput.status || 'sucesso',\n  arquivo: pythonOutput.arquivo || 'documento.docx',\n  timestamp: new Date().toISOString(),\n  modo_extracao: $node['IA (Escreve Texto Técnico)'].json.tipo_peca || ''\n};"
+      },
+      "id": "format-response",
+      "name": "Formata Resposta JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1700, 340]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Responde ao Streamlit",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1900, 340]
+    }
+  ],
+  "connections": {
+    "Webhook (Recebe Pedido)": {
+      "main": [
+        [
+          {
+            "node": "Modo Extração?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modo Extração?": {
+      "main": [
+        [
+          {
+            "node": "Extrai Dados dos PDFs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepara Dados (Manual)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrai Dados dos PDFs": {
+      "main": [
+        [
+          {
+            "node": "Merge Dados (Auto)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Dados (Auto)": {
+      "main": [
+        [
+          {
+            "node": "IA (Escreve Texto Técnico)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara Dados (Manual)": {
+      "main": [
+        [
+          {
+            "node": "IA (Escreve Texto Técnico)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA (Escreve Texto Técnico)": {
+      "main": [
+        [
+          {
+            "node": "Prepara para Python",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara para Python": {
+      "main": [
+        [
+          {
+            "node": "Python (Gera .DOCX)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Python (Gera .DOCX)": {
+      "main": [
+        [
+          {
+            "node": "Formata Resposta JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formata Resposta JSON": {
+      "main": [
+        [
+          {
+            "node": "Responde ao Streamlit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

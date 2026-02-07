@@ -2,57 +2,58 @@ version: '3.8'
 
 services:
   # ========================================
-  # Serviço n8n - Orquestração de Workflows
+  # Nginx - Reverse Proxy
   # ========================================
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: engenharia-n8n
+  nginx:
+    image: nginx:alpine
+    container_name: engenharia-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - streamlit
+    networks:
+      - engenharia_network
+    restart: unless-stopped
+
+  # ========================================
+  # Backend Python - API de Processamento
+  # ========================================
+  backend:
+    build:
+      context: ./backend
+    container_name: engenharia-backend
     restart: unless-stopped
     ports:
-      - "5678:5678"
+      - "5000:5000"
     environment:
       # Timezone
       - TZ=America/Sao_Paulo
-      - GENERIC_TIMEZONE=America/Sao_Paulo
       
-      # Configurações do n8n
-      - N8N_HOST=0.0.0.0
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://n8n:5678/
+      # OpenAI API Key
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       
-      # Execuções
-      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
-      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
-      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
-      
-      # Segurança
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=admin
-      - N8N_BASIC_AUTH_PASSWORD=engenharia2025
-      
-      # Permitir execução de scripts
-      - N8N_ALLOW_EXECUTION_OF_ALL_SCRIPTS=true
+      # Porta do servidor
+      - PORT=5000
     
     volumes:
-      # Persistência de dados do n8n
-      - ./n8n_data:/home/node/.n8n
-      
-      # Pasta compartilhada com Streamlit (padronizado para /data)
+      # Pasta compartilhada (uploads e outputs)
       - ./shared_files:/data
       
-      # Scripts Python para execução de automações
+      # Scripts Python
       - ../python_scripts:/data/python_scripts:ro
     
     networks:
       - engenharia_network
     
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/healthz"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 10s
 
   # ========================================
   # Serviço Streamlit - Interface Web
@@ -77,7 +78,7 @@ services:
       - engenharia_network
     
     depends_on:
-      - n8n
+      - backend
     
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]

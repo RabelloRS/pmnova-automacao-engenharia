@@ -22,6 +22,8 @@ import re
 import os
 from datetime import datetime
 
+from modelos_justificativa import buscar_modelos_similares
+
 def limpar_moeda(valor_str):
     """
     Converte valores monetários para formato limpo.
@@ -35,6 +37,18 @@ def limpar_moeda(valor_str):
     if not valor_str: 
         return "0,00"
     return valor_str.strip().replace('R$', '').strip()
+
+
+def sugerir_justificativa(objeto: str, base_dir: str = "/data/modelos_justificativa", top_k: int = 3):
+    """Busca modelos semelhantes e retorna texto sugerido + metadados."""
+    try:
+        resultados = buscar_modelos_similares(objeto, base_dir=base_dir, top_k=top_k)
+        if not resultados:
+            return "", []
+        # Usa o melhor resultado como sugestão inicial
+        return resultados[0].get("trecho", ""), resultados
+    except Exception:
+        return "", []
 
 def extrair_dados_caixa(caminho_pasta_arquivos):
     """
@@ -58,7 +72,9 @@ def extrair_dados_caixa(caminho_pasta_arquivos):
         "AREA_TOTAL": "0,00",
         "MUNICIPIO": "Nova Petrópolis",
         "UF": "RS",
-        "TIMESTAMP": datetime.now().isoformat()
+        "TIMESTAMP": datetime.now().isoformat(),
+        "JUSTIFICATIVA_SUGERIDA": "",
+        "MODELOS_REFERENCIA": []
     }
 
     # =====================================
@@ -237,6 +253,13 @@ def extrair_dados_caixa(caminho_pasta_arquivos):
     
     # Monta LOCAL completo
     dados["LOCAL"] = f"{dados['MUNICIPIO']}/{dados['UF']}"
+
+    # ================================================
+    # 5. SUGESTÃO DE JUSTIFICATIVA VIA MODELOS
+    # ================================================
+    sugestao, modelos_ref = sugerir_justificativa(dados.get("OBJETO", ""))
+    dados["JUSTIFICATIVA_SUGERIDA"] = sugestao
+    dados["MODELOS_REFERENCIA"] = modelos_ref
 
     return dados
 
